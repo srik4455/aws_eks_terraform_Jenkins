@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+    environment {
+        // set up the aws credentails and provide the variables to it
+        AWS_ACCESS_KEY_ID = credentials('aws_access_key_id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+
+    }
+    stages {
+        stage('Checkout SCM'){
+            steps {
+                script {
+                    // checkout from version control and add the git credetials if it is private repo 
+                }
+            }
+        }
+        stage('Initialise Terraform'){
+            steps {
+                script {
+                    dir('eks_cluster') {
+                        sh 'terraform init'
+                    }
+                }
+            }
+        }
+        stage('Formatting Terraform'){
+            steps {
+                script {
+                    dir('eks_cluster') {
+                        sh 'terraform fmt'
+                    }
+                }
+            }
+        }
+        stage('Validating Terraform'){
+            steps {
+                script {
+                    dir('eks_cluster') {
+                        sh 'terraform validate'
+                    }
+                }
+            }
+        }   
+        stage('Preview Terraform'){
+            steps {
+                script {
+                    dir('eks_cluster') {
+                        sh 'terraform plan'
+                    }
+                    input (message: "please help to preview and approve ", ok: "Proceed")
+                }
+            }
+        }  
+        stage('creating/destroy Terraform'){
+            steps {
+                script {
+                    dir('eks_cluster') {
+                        sh 'terraform $action --auto-approve'
+                        //in pipeline we can parameterise it
+                        //Name = action
+                        //Choices = apply
+                        //            destroy
+                        //description = to apply or destroy changes by terraform
+                    }
+                }
+            }
+        }
+        stage('Deploying Nginx Application') {
+            steps{
+                script{
+                    dir('eks_cluster/configuration') {
+                        sh 'aws eks update-kubeconfig --name my-eks-cluster'
+                        sh 'kubectl apply -f deployment.yaml'
+                        sh 'kubectl apply -f service.yaml'
+                    }
+                }
+            }
+        }  
+    }
+}
